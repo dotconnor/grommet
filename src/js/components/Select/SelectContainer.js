@@ -39,9 +39,27 @@ const SelectOption = styled(Button)`
   width: 100%;
 `;
 
+const ClearButton = ({ clear, onClear, name, theme, setFocus }) => {
+  const { label, position } = clear;
+  const align = position !== 'bottom' ? 'start' : 'center';
+  const buttonLabel = label || `Clear ${name || 'selection'}`;
+  return (
+    <Button
+      onClick={onClear}
+      onFocus={() => setFocus(true)}
+      onBlur={() => setFocus(false)}
+    >
+      <Box {...theme.select.clear.container} align={align}>
+        <Text {...theme.select.clear.text}>{buttonLabel}</Text>
+      </Box>
+    </Button>
+  );
+};
+
 const SelectContainer = forwardRef(
   (
     {
+      clear,
       children = null,
       disabled,
       disabledKey,
@@ -50,13 +68,17 @@ const SelectContainer = forwardRef(
       id,
       labelKey,
       multiple,
+      name,
       onChange,
       onKeyDown,
       onMore,
       onSearch,
       optionIndexesInValue,
-      options,
+      options: optionsProp,
+      allOptions,
       searchPlaceholder,
+      search,
+      setSearch,
       selected,
       value = '',
       valueKey,
@@ -65,12 +87,11 @@ const SelectContainer = forwardRef(
     ref,
   ) => {
     const theme = useContext(ThemeContext) || defaultProps.theme;
-    const [search, setSearch] = useState();
     const [activeIndex, setActiveIndex] = useState(-1);
     const [keyboardNavigation, setKeyboardNavigation] = useState();
+    const [focus, setFocus] = useState(false);
     const searchRef = useRef();
     const optionsRef = useRef();
-
     // adjust activeIndex when options change
     useEffect(() => {
       if (activeIndex === -1 && search && optionIndexesInValue.length) {
@@ -106,18 +127,18 @@ const SelectContainer = forwardRef(
     }, [keyboardNavigation]);
 
     const optionLabel = useCallback(
-      index => applyKey(options[index], labelKey),
-      [labelKey, options],
+      index => applyKey(optionsProp[index], labelKey),
+      [labelKey, optionsProp],
     );
 
     const optionValue = useCallback(
-      index => applyKey(options[index], valueKey),
-      [options, valueKey],
+      index => applyKey(optionsProp[index], valueKey),
+      [optionsProp, valueKey],
     );
 
     const isDisabled = useCallback(
       index => {
-        const option = options[index];
+        const option = optionsProp[index];
         let result;
         if (disabledKey) {
           result = applyKey(option, disabledKey);
@@ -131,7 +152,7 @@ const SelectContainer = forwardRef(
         }
         return result;
       },
-      [disabled, disabledKey, options, optionValue],
+      [disabled, disabledKey, optionsProp, optionValue],
     );
 
     const isSelected = useCallback(
@@ -178,33 +199,48 @@ const SelectContainer = forwardRef(
           let nextSelected;
           if (multiple) {
             const nextOptionIndexesInValue = optionIndexesInValue.slice(0);
-            const valueIndex = optionIndexesInValue.indexOf(index);
+            const allOptionsIndex = allOptions.indexOf(optionsProp[index]);
+            const valueIndex = optionIndexesInValue.indexOf(allOptionsIndex);
             if (valueIndex === -1) {
-              nextOptionIndexesInValue.push(index);
+              nextOptionIndexesInValue.push(allOptionsIndex);
             } else {
               nextOptionIndexesInValue.splice(valueIndex, 1);
             }
             nextValue = nextOptionIndexesInValue.map(i =>
               valueKey && valueKey.reduce
-                ? applyKey(options[i], valueKey)
-                : options[i],
+                ? applyKey(allOptions[i], valueKey)
+                : allOptions[i],
             );
             nextSelected = nextOptionIndexesInValue;
           } else {
             nextValue =
               valueKey && valueKey.reduce
-                ? applyKey(options[index], valueKey)
-                : options[index];
+                ? applyKey(allOptions[index], valueKey)
+                : allOptions[index];
             nextSelected = index;
           }
           onChange(event, {
-            option: options[index],
+            option: allOptions[index],
             value: nextValue,
             selected: nextSelected,
           });
         }
       },
-      [multiple, onChange, optionIndexesInValue, options, valueKey],
+      [
+        multiple,
+        onChange,
+        optionIndexesInValue,
+        optionsProp,
+        allOptions,
+        valueKey,
+      ],
+    );
+
+    const onClear = useCallback(
+      event => {
+        onChange(event, { option: undefined, value: '', selected: '' });
+      },
+      [onChange],
     );
 
     const onNextOption = useCallback(
@@ -212,17 +248,17 @@ const SelectContainer = forwardRef(
         event.preventDefault();
         let nextActiveIndex = activeIndex + 1;
         while (
-          nextActiveIndex < options.length &&
+          nextActiveIndex < optionsProp.length &&
           isDisabled(nextActiveIndex)
         ) {
           nextActiveIndex += 1;
         }
-        if (nextActiveIndex !== options.length) {
+        if (nextActiveIndex !== optionsProp.length) {
           setActiveIndex(nextActiveIndex);
           setKeyboardNavigation(true);
         }
       },
-      [activeIndex, isDisabled, options],
+      [activeIndex, isDisabled, optionsProp],
     );
 
     const onPreviousOption = useCallback(
@@ -249,12 +285,12 @@ const SelectContainer = forwardRef(
 
     const onSelectOption = useCallback(
       event => {
-        if (activeIndex >= 0) {
+        if (activeIndex >= 0 && !focus) {
           event.preventDefault(); // prevent submitting forms
           selectOption(activeIndex)(event);
         }
       },
-      [activeIndex, selectOption],
+      [activeIndex, selectOption, focus],
     );
 
     const customSearchInput = theme.select.searchInput;
@@ -297,10 +333,19 @@ const SelectContainer = forwardRef(
               />
             </Box>
           )}
+          {clear && clear.position !== 'bottom' && value && (
+            <ClearButton
+              clear={clear}
+              name={name}
+              onClear={onClear}
+              theme={theme}
+              setFocus={setFocus}
+            />
+          )}
           <OptionsBox role="menubar" tabIndex="-1" ref={optionsRef}>
-            {options.length > 0 ? (
+            {optionsProp.length > 0 ? (
               <InfiniteScroll
-                items={options}
+                items={optionsProp}
                 step={theme.select.step}
                 onMore={onMore}
                 replace={replace}
@@ -314,7 +359,7 @@ const SelectContainer = forwardRef(
                   // as an option Button kind property.
                   let child;
                   if (children)
-                    child = children(option, index, options, {
+                    child = children(option, index, optionsProp, {
                       active: optionActive,
                       disabled: optionDisabled,
                       selected: optionSelected,
@@ -377,6 +422,15 @@ const SelectContainer = forwardRef(
               </SelectOption>
             )}
           </OptionsBox>
+          {clear && clear.position === 'bottom' && value && (
+            <ClearButton
+              clear={clear}
+              name={name}
+              onClear={onClear}
+              theme={theme}
+              setFocus={setFocus}
+            />
+          )}
         </StyledContainer>
       </Keyboard>
     );

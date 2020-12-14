@@ -5,7 +5,7 @@ import { themeDocUtils } from '../../utils/themeDocUtils';
 
 export const doc = TextInput => {
   const DocumentedTextInput = describe(TextInput)
-    .availableAt(getAvailableAtBadge('TextInput'))
+    .availableAt(getAvailableAtBadge('TextInput', 'Input'))
     .description(
       'A control to input a single line of text, with optional suggestions.',
     )
@@ -123,6 +123,9 @@ export const doc = TextInput => {
       `Suggestions to show. It is recommended to avoid showing too many
 suggestions and instead rely on the user to type more.`,
     ),
+    textAlign: PropTypes.oneOf(['start', 'center', 'end'])
+      .description('How to align the text inside the input.')
+      .defaultValue('start'),
     value: PropTypes.oneOfType([
       PropTypes.string,
       PropTypes.number,

@@ -98,6 +98,7 @@ const TextInput = forwardRef(
       readOnly,
       reverse,
       suggestions,
+      textAlign,
       value: valueProp,
       ...rest
     },
@@ -239,7 +240,9 @@ const TextInput = forwardRef(
     };
 
     const showStyledPlaceholder =
-      placeholder && typeof placeholder !== 'string' && !value;
+      placeholder &&
+      typeof placeholder !== 'string' &&
+      !(inputRef.current && inputRef.current.value);
 
     let drop;
     const extraProps = {
@@ -418,6 +421,7 @@ const TextInput = forwardRef(
             icon={icon}
             reverse={reverse}
             focus={focus}
+            textAlign={textAlign}
             {...rest}
             {...extraProps}
             defaultValue={renderLabel(defaultValue)}
